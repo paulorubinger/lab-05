@@ -1,0 +1,746 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LAB-05 — Dashboard GraphQL vs REST</title>
+  <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+  <script src="https://kit.fontawesome.com/f60cd6a28b.js" crossorigin="anonymous"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --graphql: #5B8DB8;
+      --rest: #E07B54;
+      --bg: #f0f4f8;
+      --card-bg: #ffffff;
+      --text: #1a202c;
+      --muted: #718096;
+      --border: #e2e8f0;
+      --green: #38A169;
+    }
+
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    /* ── Header ── */
+    header {
+      background: linear-gradient(135deg, #1a202c 0%, #2d3748 60%, #1e3a5f 100%);
+      color: #fff;
+      padding: 2rem;
+      text-align: center;
+    }
+    header h1 { font-size: clamp(1.4rem, 3vw, 2.2rem); font-weight: 800; letter-spacing: -0.02em; }
+    header .subtitle { color: #a0aec0; margin-top: 0.3rem; font-size: 0.95rem; }
+
+    /* ── Meta Cards ── */
+    .meta-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 1rem;
+      margin-top: 1.5rem;
+      max-width: 900px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    .meta-card {
+      background: rgba(255,255,255,0.1);
+      border-radius: 10px;
+      padding: 0.8rem 1rem;
+      border: 1px solid rgba(255,255,255,0.2);
+      backdrop-filter: blur(10px);
+    }
+    .meta-card .meta-label { font-size: 0.7rem; color: #cbd5e0; text-transform: uppercase; letter-spacing: 0.05em; }
+    .meta-card .meta-value { font-size: 1.4rem; font-weight: 700; margin-top: 0.3rem; color: #fff; }
+
+    .container { max-width: 1440px; margin: 0 auto; padding: 2rem 1.5rem; }
+
+    /* ── Tabs Container ── */
+    .tab-container {
+      background: var(--card-bg);
+      border-radius: 14px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.07), 0 4px 12px rgba(0,0,0,0.05);
+      overflow: hidden;
+    }
+
+    .tab-nav {
+      display: flex;
+      gap: 0;
+      background: #f7f9fc;
+      border-bottom: 2px solid var(--border);
+      padding: 0.5rem 1rem;
+      flex-wrap: wrap;
+    }
+
+    .tab-btn {
+      padding: 0.7rem 1.4rem;
+      border: none;
+      background: transparent;
+      cursor: pointer;
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: var(--muted);
+      transition: all 0.2s;
+      border-bottom: 3px solid transparent;
+      position: relative;
+      margin-bottom: -2px;
+    }
+
+    .tab-btn:hover { color: var(--text); }
+    .tab-btn.active {
+      color: var(--graphql);
+      border-bottom-color: var(--graphql);
+    }
+
+    .tab-content { display: none; padding: 2rem; }
+    .tab-content.active { display: block; }
+
+    /* ── Cards ── */
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+    .card {
+      background: var(--card-bg);
+      border-radius: 12px;
+      padding: 1.2rem;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+      border-left: 4px solid transparent;
+      transition: transform 0.15s;
+    }
+    .card:hover { transform: translateY(-2px); }
+    .card.gql  { border-color: var(--graphql); }
+    .card.rest { border-color: var(--rest); }
+    .card.sig  { border-color: var(--green); }
+    .card h3   { font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+    .card .value { font-size: 1.8rem; font-weight: 800; margin: 0.3rem 0; }
+    .card.gql .value { color: var(--graphql); }
+    .card.rest .value { color: var(--rest); }
+    .card.sig .value { color: var(--green); }
+    .card .delta { font-size: 0.78rem; color: var(--muted); margin-top: 0.2rem; }
+
+    /* ── Charts ── */
+    .chart-wrap { min-height: 420px; }
+    
+    .chart-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1.2rem;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+
+    .chart-title { font-size: 1.05rem; font-weight: 700; }
+
+    .filter-group {
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+    }
+
+    .filter-group label { font-size: 0.85rem; color: var(--muted); font-weight: 600; }
+
+    .filter-group select {
+      padding: 0.5rem 0.8rem;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 0.85rem;
+      background: var(--card-bg);
+      cursor: pointer;
+      color: var(--text);
+    }
+
+    /* ── Statistics Tables ── */
+    .stat-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+    }
+    .stat-table thead {
+      background: #2d3748;
+      color: white;
+    }
+    .stat-table th {
+      padding: 0.8rem;
+      text-align: center;
+      font-weight: 600;
+      border: 1px solid #e2e8f0;
+      white-space: nowrap;
+    }
+    .stat-table td {
+      padding: 0.8rem;
+      text-align: center;
+      border: 1px solid #e2e8f0;
+    }
+    .stat-table tbody tr:nth-child(odd) {
+      background: #ffffff;
+    }
+    .stat-table tbody tr:nth-child(even) {
+      background: #f7f9fc;
+    }
+    .stat-table .gql-row {
+      background: #5B8DB822 !important;
+    }
+    .stat-table .rest-row {
+      background: #E07B5422 !important;
+    }
+
+    /* ── Stat Box ── */
+    .stat-box {
+      background: linear-gradient(135deg, #f7faff, #eff8ff);
+      border: 1px solid #bee3f8;
+      border-radius: 10px;
+      padding: 1.2rem;
+      margin-top: 1.5rem;
+    }
+    .stat-box .row { display: flex; gap: 2rem; flex-wrap: wrap; }
+    .stat-box .stat-item { display: flex; flex-direction: column; }
+    .stat-box .stat-label { font-size: 0.7rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+    .stat-box .stat-val { font-size: 1rem; font-weight: 700; margin-top: 0.1rem; }
+    .stat-box .conclusion { margin-top: 0.8rem; font-size: 0.9rem; color: #2d3748; border-top: 1px solid #bee3f8; padding-top: 0.8rem; }
+
+    .stat-box.rq2 { background: linear-gradient(135deg, #fff9f6, #fff3ed); border-color: #fddccc; }
+    .stat-box.rq2 .conclusion { border-color: #fddccc; }
+
+    /* ── Conclusions ── */
+    .conclusions { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+    .concl-card {
+      border-radius: 10px;
+      padding: 1.6rem;
+      border: 2px solid;
+    }
+    .concl-card.rq1 { background: #EFF8FF; border-color: var(--graphql); }
+    .concl-card.rq2 { background: #FFF7F2; border-color: var(--rest); }
+    .concl-card h4 { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.8rem; }
+    .concl-card .big { font-size: 1.8rem; font-weight: 800; margin-bottom: 0.6rem; }
+    .concl-card p { font-size: 0.9rem; color: var(--muted); line-height: 1.6; }
+    .rq1 h4 { color: var(--graphql); }
+    .rq1 .big { color: var(--graphql); }
+    .rq2 h4 { color: var(--rest); }
+    .rq2 .big { color: var(--rest); }
+
+    footer {
+      text-align: center;
+      padding: 2rem;
+      color: var(--muted);
+      font-size: 0.8rem;
+      border-top: 1px solid var(--border);
+      margin-top: 2rem;
+    }
+
+    @media (max-width: 768px) {
+      .conclusions { grid-template-columns: 1fr; }
+      .stat-box .row { gap: 1rem; }
+      .meta-cards { grid-template-columns: 1fr 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>GraphQL vs REST — Experimento Controlado</h1>
+  <p class="subtitle">LAB-05 · Laboratório de Experimentação de Software · PUC Minas</p>
+  <div class="meta-cards">
+    <div class="meta-card">
+      <div class="meta-label">Repositórios</div>
+      <div class="meta-value">20</div>
+    </div>
+    <div class="meta-card">
+      <div class="meta-label">Trials × APIs</div>
+      <div class="meta-value">30 × 2</div>
+    </div>
+    <div class="meta-card">
+      <div class="meta-label">Medições</div>
+      <div class="meta-value">1.200</div>
+    </div>
+    <div class="meta-card">
+      <div class="meta-label">Teste Estatístico</div>
+      <div class="meta-value">Mann-Whitney U</div>
+    </div>
+  </div>
+</header>
+
+<div class="container">
+
+  <!-- ── Key Metrics Cards ── -->
+  <div class="cards">
+    <div class="card gql">
+      <h3>Tempo Mediano GraphQL</h3>
+      <div class="value">425 ms</div>
+      <div class="delta"><strong>↓ 17,9% mais rápido</strong> que REST</div>
+    </div>
+    <div class="card rest">
+      <h3>Tempo Mediano REST</h3>
+      <div class="value">517 ms</div>
+      <div class="delta">Baseline de referência</div>
+    </div>
+    <div class="card gql">
+      <h3>Tamanho Mediano GraphQL</h3>
+      <div class="value">246 B</div>
+      <div class="delta"><strong>↓ 96% menor</strong> que REST</div>
+    </div>
+    <div class="card rest">
+      <h3>Tamanho Mediano REST</h3>
+      <div class="value">6.207 B</div>
+      <div class="delta">Baseline de referência</div>
+    </div>
+    <div class="card sig">
+      <h3>Ambas as RQs</h3>
+      <div class="value">p &lt; 0,001</div>
+      <div class="delta">Diferença altamente significativa</div>
+    </div>
+  </div>
+
+  <!-- ── Tab Container ── -->
+  <div class="tab-container">
+    <div class="tab-nav">
+      <button class="tab-btn active" onclick="switchTab('rq1', this)"><i class="fa-solid fa-clock"></i> RQ1: Tempo de Resposta</button>
+      <button class="tab-btn" onclick="switchTab('rq2', this)"><i class="fa-solid fa-database"></i> RQ2: Tamanho da Resposta</button>
+      <button class="tab-btn" onclick="switchTab('temporal', this)"><i class="fa-solid fa-chart-line"></i> Estabilidade Temporal</button>
+      <button class="tab-btn" onclick="switchTab('stats', this)"><i class="fa-solid fa-list"></i> Estatísticas Descritivas</button>
+      <button class="tab-btn" onclick="switchTab('conclusion', this)"><i class="fa-solid fa-check"></i> Conclusões</button>
+    </div>
+
+    <!-- ── TAB 1: RQ1 ── -->
+    <div id="rq1" class="tab-content active">
+      <h2 style="margin-bottom: 1.5rem; border: none;">RQ1: As respostas GraphQL são mais rápidas que REST?</h2>
+      
+      <div class="chart-header">
+        <div class="chart-title">Distribuição do Tempo de Resposta</div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr;gap:1.5rem;margin-bottom:2rem">
+        <div id="rq1-box" class="chart-wrap" style="min-height:320px"></div>
+      </div>
+
+      <div class="chart-header" style="margin-top:2rem">
+        <h3 style="margin:0;font-size:1.05rem;font-weight:700">Mediana por Repositório</h3>
+        <div class="filter-group">
+          <label for="filter-rq1">Filtrar por repositório:</label>
+          <select id="filter-rq1" onchange="filterChartRQ1(this.value)">
+            <option value="">Mostrar todos</option>
+          </select>
+        </div>
+      </div>
+      <div id="rq1-repo" class="chart-wrap" style="min-height:320px"></div>
+
+      <div class="stat-box">
+        <div class="row">
+          <div class="stat-item"><span class="stat-label">Mann-Whitney U</span><span class="stat-val">71.236</span></div>
+          <div class="stat-item"><span class="stat-label">p-valor</span><span class="stat-val">2,23 × 10⁻⁷³</span></div>
+          <div class="stat-item"><span class="stat-label">Tamanho do efeito (r)</span><span class="stat-val">0,6042 — grande</span></div>
+          <div class="stat-item"><span class="stat-label">Diferença</span><span class="stat-val">17,9% (GraphQL mais rápido)</span></div>
+        </div>
+        <div class="conclusion">
+          <strong>H₀ rejeitada</strong> — GraphQL é significativamente mais rápido que REST.
+          Tempo mediano de <strong>425 ms</strong> vs <strong>517 ms</strong>, uma redução de 92 ms por requisição.
+        </div>
+      </div>
+    </div>
+
+    <!-- ── TAB 2: RQ2 ── -->
+    <div id="rq2" class="tab-content">
+      <h2 style="margin-bottom: 1.5rem; border: none;">RQ2: As respostas GraphQL têm tamanho menor que REST?</h2>
+      
+      <div class="chart-header">
+        <div class="chart-title">Distribuição do Tamanho da Resposta</div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-bottom:2rem">
+        <div id="rq2-box-gql" class="chart-wrap" style="min-height:320px"></div>
+        <div id="rq2-box-rest" class="chart-wrap" style="min-height:320px"></div>
+      </div>
+
+      <h3 style="margin-top: 2rem; margin-bottom: 1rem;">Mediana por Repositório</h3>
+      <div class="filter-group" style="margin-bottom: 1rem;">
+        <label for="filter-rq2">Filtrar por repositório:</label>
+        <select id="filter-rq2" onchange="filterChartRQ2(this.value)">
+          <option value="">Mostrar todos</option>
+        </select>
+      </div>
+      <div id="rq2-repo" class="chart-wrap" style="min-height:320px"></div>
+
+      <div class="stat-box rq2">
+        <div class="row">
+          <div class="stat-item"><span class="stat-label">Mann-Whitney U</span><span class="stat-val">0</span></div>
+          <div class="stat-item"><span class="stat-label">p-valor</span><span class="stat-val">1,08 × 10⁻¹⁹⁷</span></div>
+          <div class="stat-item"><span class="stat-label">Tamanho do efeito (r)</span><span class="stat-val">1,0000 — máximo</span></div>
+          <div class="stat-item"><span class="stat-label">Redução</span><span class="stat-val">96,0% (GraphQL menor)</span></div>
+        </div>
+        <div class="conclusion">
+          <strong>H₀ rejeitada</strong> — Toda resposta GraphQL foi menor que REST.
+          Tamanho mediano de <strong>246 bytes</strong> vs <strong>6.207 bytes</strong> — redução de 25× no payload.
+        </div>
+      </div>
+    </div>
+
+    <!-- ── TAB 3: Temporal ── -->
+    <div id="temporal" class="tab-content">
+      <h2 style="margin-bottom: 1.5rem; border: none;">Estabilidade das Medições — Mediana por Trial</h2>
+      <p style="color: var(--muted); margin-bottom: 1rem; font-size: 0.9rem;">
+        Este gráfico mostra a consistência das medições ao longo dos 30 trials, confirmando a robustez do experimento.
+      </p>
+      <div id="chart-temporal" class="chart-wrap" style="min-height: 380px;"></div>
+    </div>
+
+    <!-- ── TAB 4: Estatísticas ── -->
+    <div id="stats" class="tab-content">
+      <h2 style="margin-bottom: 1.5rem; border: none;">Resumo das Estatísticas Descritivas</h2>
+      
+      <h3 style="margin-bottom: 1rem;">RQ1 — Tempo de Resposta (ms)</h3>
+      <div id="chart-table-rq1" style="overflow-x:auto;background:#f9fafb;border-radius:8px;padding:1rem"></div>
+
+      <h3 style="margin-top: 2rem; margin-bottom: 1rem;">RQ2 — Tamanho da Resposta (bytes)</h3>
+      <div id="chart-table-rq2" style="overflow-x:auto;background:#f9fafb;border-radius:8px;padding:1rem"></div>
+    </div>
+
+    <!-- ── TAB 5: Conclusões ── -->
+    <div id="conclusion" class="tab-content">
+      <h2 style="margin-bottom: 1.5rem; border: none;">Conclusões Finais</h2>
+      
+      <div class="conclusions">
+        <div class="concl-card rq1">
+          <h4>RQ1 — Tempo de Resposta</h4>
+          <div class="big">17,9% mais rápido</div>
+          <p>Respostas GraphQL são estatisticamente significativamente mais rápidas que REST em todos os 20 repositórios
+             (mediana 425 ms vs 517 ms, p &lt; 0,001, grande efeito r = 0,60).</p>
+        </div>
+        <div class="concl-card rq2">
+          <h4>RQ2 — Tamanho da Resposta</h4>
+          <div class="big">96% menor</div>
+          <p>Respostas GraphQL são dramaticamente menores que REST, eliminando o over-fetching
+             (mediana 246 B vs 6.207 B, p &lt; 0,001, efeito máximo r = 1,00).</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<footer>
+  LAB-05 · GraphQL vs REST · PUC Minas · Laboratório de Experimentação de Software
+</footer>
+
+<script src="data.js"></script>
+<script>
+  /* ================================================================
+     COLOR SCHEME
+  ================================================================ */
+  const C = { gql: '#5B8DB8', rest: '#E07B54' };
+
+  /* ================================================================
+     LAYOUT DEFAULTS
+  ================================================================ */
+  const baseLayout = {
+    plot_bgcolor: '#ffffff',
+    paper_bgcolor: '#ffffff',
+    font: { family: "'Segoe UI', system-ui, sans-serif", size: 11 },
+    margin: { t: 40, b: 60, l: 60, r: 20 },
+    legend: { orientation: 'h', y: -0.2, x: 0.5, xanchor: 'center', yanchor: 'top' },
+    hoverlabel: { bgcolor: '#1a202c', font: { color: '#fff' } },
+  };
+  const cfg = { responsive: true, displayModeBar: false };
+
+  /* ================================================================
+     CHARTS INITIALIZATION
+  ================================================================ */
+  function initAllCharts() {
+    initRQ1BoxPlot();
+    initRQ1BarChart();
+    initRQ2BoxPlot();
+    initRQ2BarChart();
+    initTemporalChart();
+    initStatsTables();
+    populateFilterSelect();
+  }
+
+  /* ── RQ1 Box Plot ── */
+  function initRQ1BoxPlot() {
+    Plotly.newPlot('rq1-box', [
+      {
+        type: 'box', name: 'REST',
+        q1: [456.0], median: [517.489], q3: [547.134],
+        lowerfence: [356.914], upperfence: [1146.412], mean: [528.685],
+        marker: { color: C.rest, size: 4 },
+        line: { color: C.rest, width: 2 },
+        fillcolor: C.rest + '33',
+      },
+      {
+        type: 'box', name: 'GraphQL',
+        q1: [395.94], median: [425.116], q3: [470.423],
+        lowerfence: [332.216], upperfence: [1036.376], mean: [441.133],
+        marker: { color: C.gql, size: 4 },
+        line: { color: C.gql, width: 2 },
+        fillcolor: C.gql + '33',
+      }
+    ], {
+      ...baseLayout,
+      title: '',
+      yaxis: { title: 'Tempo de Resposta (ms)', gridcolor: '#f0f4f8', zeroline: false },
+      xaxis: { showticklabels: false },
+    }, cfg);
+  }
+
+  /* ── RQ1 Bar Chart ── */
+  function initRQ1BarChart() {
+    Plotly.newPlot('rq1-repo', [
+      { type: 'bar', name: 'REST', x: reposTime, y: restTime, marker: { color: C.rest + 'aa' }, hovertemplate: '<b>%{x}</b><br>REST: %{y} ms<extra></extra>' },
+      { type: 'bar', name: 'GraphQL', x: reposTime, y: gqlTime, marker: { color: C.gql + 'aa' }, hovertemplate: '<b>%{x}</b><br>GraphQL: %{y} ms<extra></extra>' }
+    ], {
+      ...baseLayout,
+      title: '',
+      barmode: 'group',
+      yaxis: { title: 'Tempo Mediano (ms)', gridcolor: '#f0f4f8', zeroline: false },
+      xaxis: { tickangle: -45, tickfont: { size: 9 } },
+    }, cfg);
+  }
+
+  /* ── RQ2 Box Plot ── */
+  function initRQ2BoxPlot() {
+    // GraphQL subplot
+    Plotly.newPlot('rq2-box-gql', [
+      {
+        type: 'box', name: 'GraphQL',
+        q1: [226.0], median: [245.5], q3: [262.0],
+        lowerfence: [208.0], upperfence: [544.0], mean: [266.25],
+        marker: { color: C.gql, size: 4 },
+        line: { color: C.gql, width: 2 },
+        fillcolor: C.gql + '33',
+      }
+    ], {
+      ...baseLayout,
+      title: 'GraphQL Response Size',
+      yaxis: { title: 'Tamanho da Resposta (bytes)', gridcolor: '#f0f4f8', zeroline: false },
+      xaxis: { showticklabels: false },
+    }, cfg);
+
+    // REST subplot
+    Plotly.newPlot('rq2-box-rest', [
+      {
+        type: 'box', name: 'REST',
+        q1: [6069.25], median: [6207.0], q3: [6484.0],
+        lowerfence: [5079.0], upperfence: [6822.0], mean: [6225.65],
+        marker: { color: C.rest, size: 4 },
+        line: { color: C.rest, width: 2 },
+        fillcolor: C.rest + '33',
+      }
+    ], {
+      ...baseLayout,
+      title: 'REST Response Size',
+      yaxis: { title: 'Tamanho da Resposta (bytes)', gridcolor: '#f0f4f8', zeroline: false },
+      xaxis: { showticklabels: false },
+    }, cfg);
+  }
+
+  /* ── RQ2 Bar Chart ── */
+  function initRQ2BarChart() {
+    Plotly.newPlot('rq2-repo', [
+      { type: 'bar', name: 'REST', x: reposSize, y: restSize, marker: { color: C.rest + 'aa' }, hovertemplate: '<b>%{x}</b><br>REST: %{y} B<extra></extra>' },
+      { type: 'bar', name: 'GraphQL', x: reposSize, y: gqlSize, marker: { color: C.gql + 'aa' }, hovertemplate: '<b>%{x}</b><br>GraphQL: %{y} B<extra></extra>' }
+    ], {
+      ...baseLayout,
+      title: '',
+      barmode: 'group',
+      yaxis: { title: 'Tamanho Mediano (bytes)', gridcolor: '#f0f4f8', zeroline: false },
+      xaxis: { tickangle: -45, tickfont: { size: 9 } },
+    }, cfg);
+  }
+
+  /* ── Temporal Chart ── */
+  function initTemporalChart() {
+    Plotly.newPlot('chart-temporal', [
+      { type: 'scatter', mode: 'lines+markers', name: 'REST', x: trials, y: temporalRest, line: { color: C.rest, width: 2 }, marker: { size: 4 }, hovertemplate: 'Trial %{x}<br>REST: %{y:.0f} ms<extra></extra>' },
+      { type: 'scatter', mode: 'lines+markers', name: 'GraphQL', x: trials, y: temporalGql, line: { color: C.gql, width: 2 }, marker: { size: 4 }, hovertemplate: 'Trial %{x}<br>GraphQL: %{y:.0f} ms<extra></extra>' },
+      { type: 'scatter', mode: 'lines', name: '', x: [1, 30], y: [517.5, 517.5], line: { color: C.rest, width: 1.5, dash: 'dot' }, showlegend: false, hoverinfo: 'skip' },
+      { type: 'scatter', mode: 'lines', name: '', x: [1, 30], y: [425.1, 425.1], line: { color: C.gql, width: 1.5, dash: 'dot' }, showlegend: false, hoverinfo: 'skip' }
+    ], {
+      ...baseLayout,
+      title: '',
+      xaxis: { title: 'Trial', dtick: 5, gridcolor: '#f0f4f8' },
+      yaxis: { title: 'Tempo Mediano (ms)', gridcolor: '#f0f4f8', zeroline: false },
+    }, cfg);
+  }
+
+  /* ── Stats Tables ── */
+  function initStatsTables() {
+    const html1 = `
+      <table class="stat-table">
+        <thead>
+          <tr>
+            <th>API</th>
+            <th>N</th>
+            <th>Média (ms)</th>
+            <th>Mediana (ms)</th>
+            <th>DP (ms)</th>
+            <th>Mín (ms)</th>
+            <th>Máx (ms)</th>
+            <th>Q25 (ms)</th>
+            <th>Q75 (ms)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="gql-row">
+            <td><strong>GraphQL</strong></td>
+            <td>600</td>
+            <td>441,13</td>
+            <td>425,12</td>
+            <td>70,18</td>
+            <td>332,22</td>
+            <td>1.036,38</td>
+            <td>395,94</td>
+            <td>470,42</td>
+          </tr>
+          <tr class="rest-row">
+            <td><strong>REST</strong></td>
+            <td>600</td>
+            <td>528,68</td>
+            <td>517,49</td>
+            <td>106,72</td>
+            <td>356,91</td>
+            <td>1.146,41</td>
+            <td>456,00</td>
+            <td>547,13</td>
+          </tr>
+        </tbody>
+      </table>
+    `;
+    document.getElementById('chart-table-rq1').innerHTML = html1;
+
+    const html2 = `
+      <table class="stat-table">
+        <thead>
+          <tr>
+            <th>API</th>
+            <th>N</th>
+            <th>Média (B)</th>
+            <th>Mediana (B)</th>
+            <th>DP (B)</th>
+            <th>Mín (B)</th>
+            <th>Máx (B)</th>
+            <th>Q25 (B)</th>
+            <th>Q75 (B)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="gql-row">
+            <td><strong>GraphQL</strong></td>
+            <td>600</td>
+            <td>266,25</td>
+            <td>245,50</td>
+            <td>74,78</td>
+            <td>208</td>
+            <td>544</td>
+            <td>226,00</td>
+            <td>262,00</td>
+          </tr>
+          <tr class="rest-row">
+            <td><strong>REST</strong></td>
+            <td>600</td>
+            <td>6.225,65</td>
+            <td>6.207,00</td>
+            <td>359,75</td>
+            <td>5.079</td>
+            <td>6.822</td>
+            <td>6.069,25</td>
+            <td>6.484,00</td>
+          </tr>
+        </tbody>
+      </table>
+    `;
+    document.getElementById('chart-table-rq2').innerHTML = html2;
+  }
+
+  /* ================================================================
+     FILTER FUNCTIONALITY
+  ================================================================ */
+  function populateFilterSelect() {
+    const selectRQ1 = document.getElementById('filter-rq1');
+    reposTime.forEach(repo => {
+      const option = document.createElement('option');
+      option.value = repo;
+      option.textContent = repo;
+      selectRQ1.appendChild(option);
+    });
+
+    const selectRQ2 = document.getElementById('filter-rq2');
+    reposSize.forEach(repo => {
+      const option = document.createElement('option');
+      option.value = repo;
+      option.textContent = repo;
+      selectRQ2.appendChild(option);
+    });
+  }
+
+  function filterChartRQ1(repoName) {
+    if (!repoName) {
+      initRQ1BarChart();
+      return;
+    }
+    const idx = reposTime.indexOf(repoName);
+    if (idx === -1) return;
+
+    Plotly.newPlot('rq1-repo', [
+      { type: 'bar', name: 'REST', x: [repoName], y: [restTime[idx]], marker: { color: C.rest }, hovertemplate: '<b>%{x}</b><br>REST: %{y} ms<extra></extra>' },
+      { type: 'bar', name: 'GraphQL', x: [repoName], y: [gqlTime[idx]], marker: { color: C.gql }, hovertemplate: '<b>%{x}</b><br>GraphQL: %{y} ms<extra></extra>' }
+    ], {
+      ...baseLayout,
+      title: '',
+      barmode: 'group',
+      yaxis: { title: 'Tempo Mediano (ms)', gridcolor: '#f0f4f8', zeroline: false },
+      xaxis: { tickfont: { size: 10 } },
+    }, cfg);
+  }
+
+  function filterChartRQ2(repoName) {
+    if (!repoName) {
+      initRQ2BarChart();
+      return;
+    }
+    const idx = reposSize.indexOf(repoName);
+    if (idx === -1) return;
+
+    Plotly.newPlot('rq2-repo', [
+      { type: 'bar', name: 'REST', x: [repoName], y: [restSize[idx]], marker: { color: C.rest }, hovertemplate: '<b>%{x}</b><br>REST: %{y} B<extra></extra>' },
+      { type: 'bar', name: 'GraphQL', x: [repoName], y: [gqlSize[idx]], marker: { color: C.gql }, hovertemplate: '<b>%{x}</b><br>GraphQL: %{y} B<extra></extra>' }
+    ], {
+      ...baseLayout,
+      title: '',
+      barmode: 'group',
+      yaxis: { title: 'Tamanho Mediano (bytes)', gridcolor: '#f0f4f8', zeroline: false },
+      xaxis: { tickfont: { size: 10 } },
+    }, cfg);
+  }
+
+  /* ================================================================
+     TAB SWITCHING
+  ================================================================ */
+  function switchTab(tabName, btn) {
+    document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+    
+    document.getElementById(tabName).classList.add('active');
+    btn.classList.add('active');
+
+    // Re-render charts when tab is shown (for proper scaling)
+    setTimeout(() => {
+      Plotly.Plots.resize('rq1-box');
+      Plotly.Plots.resize('rq1-repo');
+      Plotly.Plots.resize('rq2-box-gql');
+      Plotly.Plots.resize('rq2-box-rest');
+      Plotly.Plots.resize('rq2-repo');
+      Plotly.Plots.resize('chart-temporal');
+    }, 50);
+  }
+
+  /* ================================================================
+     INITIALIZATION
+  ================================================================ */
+  document.addEventListener('DOMContentLoaded', initAllCharts);
+</script>
+</body>
+</html>
