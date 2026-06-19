@@ -5,6 +5,7 @@ Calculates median response times and sizes per repository and API type.
 """
 
 import pandas as pd
+import numpy as np
 import json
 from pathlib import Path
 
@@ -28,38 +29,55 @@ def load_and_process_data():
     print(f"  REST: {len(rest_data)} records")
     
     # Calculate medians per repository for RQ1 (response time)
-    gql_time_by_repo = gql_data.groupby('repo')['response_time_ms'].median().sort_values()
-    rest_time_by_repo = rest_data.groupby('repo')['response_time_ms'].median().sort_values()
+    gql_time_by_repo = gql_data.groupby('repo')['response_time_ms'].median()
+    rest_time_by_repo = rest_data.groupby('repo')['response_time_ms'].median()
     
     # Get unique repos for time (aligned with REST order for visualization)
     time_repos = sorted(set(gql_time_by_repo.index) | set(rest_time_by_repo.index))
     
-    gql_time_values = [gql_time_by_repo.get(r, None) for r in time_repos]
-    rest_time_values = [rest_time_by_repo.get(r, None) for r in time_repos]
+    gql_time_values = [round(gql_time_by_repo.get(r, None), 2) if gql_time_by_repo.get(r) is not None else None for r in time_repos]
+    rest_time_values = [round(rest_time_by_repo.get(r, None), 2) if rest_time_by_repo.get(r) is not None else None for r in time_repos]
     
     # Calculate medians per repository for RQ2 (response size)
-    gql_size_by_repo = gql_data.groupby('repo')['response_size_bytes'].median().sort_values()
-    rest_size_by_repo = rest_data.groupby('repo')['response_size_bytes'].median().sort_values()
+    gql_size_by_repo = gql_data.groupby('repo')['response_size_bytes'].median()
+    rest_size_by_repo = rest_data.groupby('repo')['response_size_bytes'].median()
     
     # Get unique repos for size
     size_repos = sorted(set(gql_size_by_repo.index) | set(rest_size_by_repo.index))
     
-    gql_size_values = [gql_size_by_repo.get(r, None) for r in size_repos]
-    rest_size_values = [rest_size_by_repo.get(r, None) for r in size_repos]
+    gql_size_values = [round(gql_size_by_repo.get(r, None), 2) if gql_size_by_repo.get(r) is not None else None for r in size_repos]
+    rest_size_values = [round(rest_size_by_repo.get(r, None), 2) if rest_size_by_repo.get(r) is not None else None for r in size_repos]
     
     # Calculate temporal stability (median per trial for both APIs)
     temporal_gql = df[df['api_type'] == 'GraphQL'].groupby('trial')['response_time_ms'].median().sort_index()
     temporal_rest = df[df['api_type'] == 'REST'].groupby('trial')['response_time_ms'].median().sort_index()
+    temporal_gql_display = [round(v, 2) for v in temporal_gql.values]
+    temporal_rest_display = [round(v, 2) for v in temporal_rest.values]
+    
+    # Calculate OVERALL medians from ALL raw data (600 values each)
+    gql_all_values = df[df['api_type'] == 'GraphQL']['response_time_ms'].values
+    rest_all_values = df[df['api_type'] == 'REST']['response_time_ms'].values
+    summary_time_gql_median = round(float(np.median(gql_all_values)), 2)
+    summary_time_rest_median = round(float(np.median(rest_all_values)), 2)
+    
+    gql_all_sizes = df[df['api_type'] == 'GraphQL']['response_size_bytes'].values
+    rest_all_sizes = df[df['api_type'] == 'REST']['response_size_bytes'].values
+    summary_size_gql_median = int(round(float(np.median(gql_all_sizes))))
+    summary_size_rest_median = int(round(float(np.median(rest_all_sizes))))
     
     return {
         'time_repos': time_repos,
-        'gql_time': [round(v, 2) if v is not None else None for v in gql_time_values],
-        'rest_time': [round(v, 2) if v is not None else None for v in rest_time_values],
+        'gql_time': gql_time_values,
+        'rest_time': rest_time_values,
         'size_repos': size_repos,
-        'gql_size': [round(v, 2) if v is not None else None for v in gql_size_values],
-        'rest_size': [round(v, 2) if v is not None else None for v in rest_size_values],
-        'temporal_gql': [round(v, 2) for v in temporal_gql.values],
-        'temporal_rest': [round(v, 2) for v in temporal_rest.values],
+        'gql_size': gql_size_values,
+        'rest_size': rest_size_values,
+        'temporal_gql': temporal_gql_display,
+        'temporal_rest': temporal_rest_display,
+        'summary_time_gql_median': summary_time_gql_median,
+        'summary_time_rest_median': summary_time_rest_median,
+        'summary_size_gql_median': summary_size_gql_median,
+        'summary_size_rest_median': summary_size_rest_median,
     }
 
 def generate_js_data(data):
@@ -82,18 +100,19 @@ const temporalRest = {json.dumps(data['temporal_rest'])};
     return js_code
 
 def generate_improved_json(data):
-    """Generate improved JSON structure grouped by repository."""
+    """Generate simplified JSON structure grouped by repository."""
     # Combine time data
     repositories_time = []
     for repo, gql, rest in zip(data['time_repos'], data['gql_time'], data['rest_time']):
         if gql is not None and rest is not None:
             diff = rest - gql
             pct = (diff / rest) * 100
+            
             repositories_time.append({
                 "name": repo,
                 "time_ms": {
-                    "graphql": round(gql, 2),
-                    "rest": round(rest, 2),
+                    "graphql": gql,
+                    "rest": rest,
                     "difference": round(diff, 2),
                     "graphql_faster_percent": round(pct, 1)
                 }
@@ -104,13 +123,15 @@ def generate_improved_json(data):
     for repo, gql, rest in zip(data['size_repos'], data['gql_size'], data['rest_size']):
         if gql is not None and rest is not None:
             reduction = (1 - gql / rest) * 100
+            ratio = gql / rest
+            
             repositories_size.append({
                 "name": repo,
                 "size_bytes": {
                     "graphql": int(gql),
                     "rest": int(rest),
                     "reduction_percent": round(reduction, 1),
-                    "size_ratio_graphql_to_rest": round(gql / rest, 4)
+                    "size_ratio_graphql_to_rest": round(ratio, 4)
                 }
             })
     
@@ -125,9 +146,19 @@ def generate_improved_json(data):
     
     # Convert to sorted list
     repositories_list = [
-        {"name": name, **data}
-        for name, data in sorted(repositories.items())
+        {"name": name, **repo_data}
+        for name, repo_data in sorted(repositories.items())
     ]
+    
+    # Calculate summary statistics from overall medians
+    summary_time_gql = data['summary_time_gql_median']
+    summary_time_rest = data['summary_time_rest_median']
+    summary_size_gql = data['summary_size_gql_median']
+    summary_size_rest = data['summary_size_rest_median']
+    
+    time_diff = summary_time_rest - summary_time_gql
+    time_pct = (time_diff / summary_time_rest) * 100
+    size_reduction = (1 - summary_size_gql / summary_size_rest) * 100
     
     return {
         "metadata": {
@@ -146,14 +177,15 @@ def generate_improved_json(data):
         },
         "summary_statistics": {
             "time_ms": {
-                "graphql_median": 425.12,
-                "rest_median": 517.49,
-                "graphql_faster_percent": 17.9
+                "graphql_median": summary_time_gql,
+                "rest_median": summary_time_rest,
+                "difference": round(time_diff, 2),
+                "graphql_faster_percent": round(time_pct, 1)
             },
             "size_bytes": {
-                "graphql_median": 246,
-                "rest_median": 6207,
-                "reduction_percent": 96.0
+                "graphql_median": summary_size_gql,
+                "rest_median": summary_size_rest,
+                "reduction_percent": round(size_reduction, 1)
             }
         }
     }
@@ -170,7 +202,7 @@ def main():
         if gql is not None and rest is not None:
             diff = rest - gql
             pct = (diff / rest) * 100
-            print(f"  {repo:15} | GraphQL: {gql:6.1f} | REST: {rest:6.1f} | Δ: {diff:6.1f} ({pct:5.1f}%)")
+            print(f"  {repo:15} | GraphQL: {gql:7.2f} | REST: {rest:7.2f} | Δ: {diff:7.2f} ({pct:6.1f}%)")
     
     print("\n" + "="*70)
     print("SUMMARY — RQ2: Response Size (bytes) Medians per Repository")
@@ -178,20 +210,21 @@ def main():
     for repo, gql, rest in zip(data['size_repos'], data['gql_size'], data['rest_size']):
         if gql is not None and rest is not None:
             reduction = (1 - gql / rest) * 100
-            print(f"  {repo:15} | GraphQL: {gql:7.1f} B | REST: {rest:7.1f} B | Reduction: {reduction:5.1f}%")
+            print(f"  {repo:15} | GraphQL: {gql:7.0f} B | REST: {rest:7.0f} B | Reduction: {reduction:6.1f}%")
     
     print("\n" + "="*70)
     print("SUMMARY — Temporal Stability (30 trials)")
     print("="*70)
-    print(f"  GraphQL medians: {[round(v, 2) for v in data['temporal_gql']]}")
-    print(f"  REST medians:    {[round(v, 2) for v in data['temporal_rest']]}")
+    print(f"  GraphQL medians (first 5): {data['temporal_gql'][:5]}")
+    print(f"  REST medians (first 5):    {data['temporal_rest'][:5]}")
+    print(f"  ...")
     
     # Save improved JSON
     OUTPUT_JSON.parent.mkdir(parents=True, exist_ok=True)
     improved_json = generate_improved_json(data)
     with open(OUTPUT_JSON, 'w') as f:
         json.dump(improved_json, f, indent=2)
-    print(f"\n✅ Saved improved JSON data to {OUTPUT_JSON}")
+    print(f"\n✅ Saved JSON data to {OUTPUT_JSON}")
     
     # Save JavaScript
     js_data = generate_js_data(data)
