@@ -101,34 +101,58 @@ def add_stat_annotation(ax, x1, x2, y, p_val):
 # ---------------------------------------------------------------------------
 
 def fig_boxplots(df: pd.DataFrame):
-    fig, axes = plt.subplots(1, 2, figsize=(14, 6))
+    fig = plt.figure(figsize=(14, 10))
+    gs = gridspec.GridSpec(2, 2, figure=fig, hspace=0.35, wspace=0.3)
     fig.suptitle("GraphQL vs REST — Distribution of Metrics", fontsize=14, fontweight="bold")
 
-    metrics = [
-        ("response_time_ms", "Response Time (ms)", "RQ1"),
-        ("response_size_bytes", "Response Size (bytes)", "RQ2"),
-    ]
+    # Row 1: RQ1 (Response Time) - side by side with both APIs
+    ax_rq1 = fig.add_subplot(gs[0, :])
+    sns.boxplot(
+        data=df,
+        x="api_type",
+        y="response_time_ms",
+        order=["REST", "GraphQL"],
+        palette=PALETTE,
+        width=0.45,
+        flierprops={"marker": "o", "markersize": 3, "alpha": 0.4},
+        ax=ax_rq1,
+    )
+    _, p_rq1, _, _, _ = mann_whitney(df, "response_time_ms")
+    y_annot_rq1 = df["response_time_ms"].quantile(0.97)
+    add_stat_annotation(ax_rq1, 0, 1, y_annot_rq1, p_rq1)
+    ax_rq1.set_title("RQ1 — Response Time (ms)", fontweight="bold")
+    ax_rq1.set_xlabel("API Type")
+    ax_rq1.set_ylabel("Response Time (ms)")
 
-    for ax, (metric, ylabel, rq) in zip(axes, metrics):
-        sns.boxplot(
-            data=df,
-            x="api_type",
-            y=metric,
-            order=["REST", "GraphQL"],
-            palette=PALETTE,
-            width=0.45,
-            flierprops={"marker": "o", "markersize": 3, "alpha": 0.4},
-            ax=ax,
-        )
-        _, p, _, _, _ = mann_whitney(df, metric)
-        y_annot = df[metric].quantile(0.97)
-        add_stat_annotation(ax, 0, 1, y_annot, p)
+    # Row 2: RQ2 (Response Size) - separate subplots for each API with optimized scales
+    ax_rq2_gql = fig.add_subplot(gs[1, 0])
+    sns.boxplot(
+        data=df[df["api_type"] == "GraphQL"],
+        y="response_size_bytes",
+        color=PALETTE["GraphQL"],
+        width=0.3,
+        flierprops={"marker": "o", "markersize": 3, "alpha": 0.4},
+        ax=ax_rq2_gql,
+    )
+    ax_rq2_gql.set_title("RQ2 — GraphQL Response Size", fontweight="bold")
+    ax_rq2_gql.set_ylabel("Response Size (bytes)")
+    ax_rq2_gql.set_xlabel("")
+    ax_rq2_gql.set_xticklabels([])
 
-        ax.set_title(f"{rq} — {ylabel.split(' (')[0]}", fontweight="bold")
-        ax.set_xlabel("API Type")
-        ax.set_ylabel(ylabel)
+    ax_rq2_rest = fig.add_subplot(gs[1, 1])
+    sns.boxplot(
+        data=df[df["api_type"] == "REST"],
+        y="response_size_bytes",
+        color=PALETTE["REST"],
+        width=0.3,
+        flierprops={"marker": "o", "markersize": 3, "alpha": 0.4},
+        ax=ax_rq2_rest,
+    )
+    ax_rq2_rest.set_title("RQ2 — REST Response Size", fontweight="bold")
+    ax_rq2_rest.set_ylabel("Response Size (bytes)")
+    ax_rq2_rest.set_xlabel("")
+    ax_rq2_rest.set_xticklabels([])
 
-    plt.tight_layout()
     path = OUTPUT_DIR / "fig1_boxplots.png"
     plt.savefig(path, bbox_inches="tight")
     print(f"Saved: {path}")
@@ -139,28 +163,54 @@ def fig_boxplots(df: pd.DataFrame):
 # ---------------------------------------------------------------------------
 
 def fig_violins(df: pd.DataFrame):
-    fig, axes = plt.subplots(1, 2, figsize=(14, 6))
+    fig = plt.figure(figsize=(14, 10))
+    gs = gridspec.GridSpec(2, 2, figure=fig, hspace=0.35, wspace=0.3)
     fig.suptitle("GraphQL vs REST — Probability Distribution", fontsize=14, fontweight="bold")
 
-    metrics = [
-        ("response_time_ms", "Response Time (ms)", "RQ1"),
-        ("response_size_bytes", "Response Size (bytes)", "RQ2"),
-    ]
+    # Row 1: RQ1 (Response Time) - side by side with both APIs
+    ax_rq1 = fig.add_subplot(gs[0, :])
+    sns.violinplot(
+        data=df,
+        x="api_type",
+        y="response_time_ms",
+        order=["REST", "GraphQL"],
+        palette=PALETTE,
+        inner="box",
+        cut=0,
+        ax=ax_rq1,
+    )
+    ax_rq1.set_title("RQ1 — Response Time (ms)", fontweight="bold")
+    ax_rq1.set_xlabel("API Type")
+    ax_rq1.set_ylabel("Response Time (ms)")
 
-    for ax, (metric, ylabel, rq) in zip(axes, metrics):
-        sns.violinplot(
-            data=df,
-            x="api_type",
-            y=metric,
-            order=["REST", "GraphQL"],
-            palette=PALETTE,
-            inner="box",
-            cut=0,
-            ax=ax,
-        )
-        ax.set_title(f"{rq} — {ylabel.split(' (')[0]}", fontweight="bold")
-        ax.set_xlabel("API Type")
-        ax.set_ylabel(ylabel)
+    # Row 2: RQ2 (Response Size) - separate subplots for each API with optimized scales
+    ax_rq2_gql = fig.add_subplot(gs[1, 0])
+    sns.violinplot(
+        data=df[df["api_type"] == "GraphQL"],
+        y="response_size_bytes",
+        color=PALETTE["GraphQL"],
+        inner="box",
+        cut=0,
+        ax=ax_rq2_gql,
+    )
+    ax_rq2_gql.set_title("RQ2 — GraphQL Response Size", fontweight="bold")
+    ax_rq2_gql.set_ylabel("Response Size (bytes)")
+    ax_rq2_gql.set_xlabel("")
+    ax_rq2_gql.set_xticklabels([])
+
+    ax_rq2_rest = fig.add_subplot(gs[1, 1])
+    sns.violinplot(
+        data=df[df["api_type"] == "REST"],
+        y="response_size_bytes",
+        color=PALETTE["REST"],
+        inner="box",
+        cut=0,
+        ax=ax_rq2_rest,
+    )
+    ax_rq2_rest.set_title("RQ2 — REST Response Size", fontweight="bold")
+    ax_rq2_rest.set_ylabel("Response Size (bytes)")
+    ax_rq2_rest.set_xlabel("")
+    ax_rq2_rest.set_xticklabels([])
 
     plt.tight_layout()
     path = OUTPUT_DIR / "fig2_violins.png"
