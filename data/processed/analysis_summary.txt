@@ -1,0 +1,51 @@
+======================================================================
+LAB-05: GraphQL vs REST — Statistical Analysis Results
+======================================================================
+
+Total valid measurements: 1200
+  GraphQL: 600
+  REST   : 600
+
+──────────────────────────────────────────────────────────────────────
+RQ1: Are GraphQL responses faster than REST?
+──────────────────────────────────────────────────────────────────────
+
+Descriptive Statistics — Response Time (ms):
+            n     mean   median      std      min       max     q25      q75
+api_type                                                                    
+GraphQL   600  441.133  425.116   70.182  332.216  1036.376  395.94  470.423
+REST      600  528.685  517.489  106.723  356.914  1146.412  456.00  547.134
+
+Mann-Whitney U Test
+  U = 71236
+  p < 0.001 *** (highly significant)
+  Effect size (rank-biserial r) = 0.6042 (large)
+
+Median GraphQL: 425.12 ms
+Median REST   : 517.49 ms
+Relative difference: 17.9% (GraphQL faster)
+
+Conclusion RQ1: H₀ rejected — GraphQL is significantly FASTER than REST.
+
+──────────────────────────────────────────────────────────────────────
+RQ2: Do GraphQL responses have smaller size than REST?
+──────────────────────────────────────────────────────────────────────
+
+Descriptive Statistics — Response Size (bytes):
+            n     mean  median      std   min   max      q25     q75
+api_type                                                            
+GraphQL   600   266.25   245.5   74.780   208   544   226.00   262.0
+REST      600  6225.65  6207.0  359.747  5079  6822  6069.25  6484.0
+
+Mann-Whitney U Test
+  U = 0
+  p < 0.001 *** (highly significant)
+  Effect size (rank-biserial r) = 1.0000 (large)
+
+Median GraphQL: 246 bytes
+Median REST   : 6207 bytes
+Relative reduction: 96.0% (GraphQL smaller)
+
+Conclusion RQ2: H₀ rejected — GraphQL produces significantly SMALLER responses than REST.
+
+======================================================================
