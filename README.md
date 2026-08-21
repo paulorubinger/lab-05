@@ -2,6 +2,12 @@
 
 > **Disciplina:** Laboratório de Experimentação de Software — PUC Minas  
 
+## Dashboard em Produção
+
+Acesse o dashboard interativo em:
+
+- https://paulorubinger.github.io/LAB-05/
+
 ## Objetivo
 
 Avaliar quantitativamente as diferenças de desempenho entre APIs GraphQL e REST, respondendo:
