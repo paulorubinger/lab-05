@@ -5,7 +5,7 @@
 **Versão do Relatório:** 1.0.0  
 **Disciplina:** Laboratório de Experimentação de Software (6º período — Engenharia de Software)  
 **Curso:** Engenharia de Software — PUC Minas  
-**Repositório:** https://github.com/PauloRubinger/lab-exp-software/LAB-05
+**Repositório:** https://github.com/PauloRubinger/LAB-05
 
 ---
 
