@@ -2,7 +2,7 @@
 
 **Autor:** Paulo Victor Pimenta Rubinger  
 **Data:** 19 de Junho de 2026  
-**Versão do Relatório:** 1.0.0  
+**Versão do Relatório:** 1.0.1  
 **Disciplina:** Laboratório de Experimentação de Software (6º período — Engenharia de Software)  
 **Curso:** Engenharia de Software — PUC Minas  
 **Repositório:** https://github.com/PauloRubinger/lab-05
