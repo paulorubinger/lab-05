@@ -6,7 +6,7 @@
 
 Acesse o dashboard interativo em:
 
-- https://paulorubinger.github.io/LAB-05/
+- https://paulorubinger.github.io/lab-05/
 
 ## Objetivo
 
