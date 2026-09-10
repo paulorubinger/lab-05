@@ -5,7 +5,7 @@
 **Versão do Relatório:** 1.0.0  
 **Disciplina:** Laboratório de Experimentação de Software (6º período — Engenharia de Software)  
 **Curso:** Engenharia de Software — PUC Minas  
-**Repositório:** https://github.com/PauloRubinger/LAB-05
+**Repositório:** https://github.com/PauloRubinger/lab-05
 
 ---
 
@@ -599,7 +599,7 @@ GraphQL é uma **alternativa viável de desempenho** para aplicações mobile e 
 
 ## Apêndice A — Reprodutibilidade
 
-Os scripts de coleta e análise estão disponíveis no repositório LAB-05:
+Os scripts de coleta e análise estão disponíveis no repositório lab-05:
 
 ```bash
 # Coleta de dados (30 min, requer token GitHub)
